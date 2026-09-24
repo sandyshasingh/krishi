@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -19,17 +20,6 @@ app.use(cors());
 // ===============================
 // MongoDB Connection
 // ===============================
-
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('Database connected successfully');
-  })
-  .catch((error) => {
-    console.error('MongoDB connection error:', error);
-  });
-
-
 // ===============================
 // Email Transporter
 // ===============================
@@ -37,8 +27,8 @@ mongoose
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: process.env.MONGODB_USERNAME,
+    pass: process.env.MONGODB_PASSWORD
   }
 });
 
@@ -263,8 +253,23 @@ app.get('/', (req, res) => {
 // Start Server
 // ===============================
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+async function startServer() {
+  const mongoUri = process.env.MONGODB_URI;
+  if (!mongoUri) {
+    throw new Error('MONGODB_URI is not set. Add it to auth-api/.env or the deployment environment.');
+  }
+
+  await mongoose.connect(mongoUri);
+  console.log('Database connected successfully');
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('Server startup failed:', error.message);
+  process.exit(1);
 });
