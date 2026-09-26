@@ -1,11 +1,24 @@
 const mongoose = require('mongoose');
+const { ALL_ROLES, USER_ROLES, VERIFICATION_STATUS, ALL_VERIFICATION_STATUSES } = require('../constants');
 
 const userSchema = new mongoose.Schema(
   {
     role: {
       type: String,
-      enum: ['buyer', 'seller'],
-      required: [true, 'Role is required and must be either buyer or seller'],
+      enum: {
+        values: ALL_ROLES,
+        message: 'Role must be one of: ' + ALL_ROLES.join(', ')
+      },
+      required: [true, 'Role is required and must be either seller, buyer, or admin'],
+      lowercase: true,
+      trim: true,
+      default: USER_ROLES.SELLER
+    },
+
+    verificationStatus: {
+      type: String,
+      enum: ALL_VERIFICATION_STATUSES,
+      default: VERIFICATION_STATUS.VERIFIED,
       lowercase: true,
       trim: true
     },

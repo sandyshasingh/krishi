@@ -7,28 +7,43 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
 const cors = require('cors');
 
 const User = require('./models/User');
+const { USER_ROLES, ALL_ROLES } = require('./constants');
 const { authenticateToken, authorizeRoles, JWT_SECRET } = require('./middleware/auth');
+const { uploadProductImages } = require('./middleware/upload.middleware');
+const productController = require('./controllers/product.controller');
+const sellerRoutes = require('./routes/seller');
 
 const app = express();
 
 app.use(express.json());
 app.use(cors());
 
+// Serve static uploaded product images
+const uploadsDir = path.join(__dirname, 'uploads/products');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+
 // Helper to format sanitized user object (without password & sensitive tokens)
 function sanitizeUser(user) {
   return {
-    id: user._id,
+    id: user._id ? user._id.toString() : user.id,
     role: user.role,
     name: user.name,
     email: user.email,
-    phoneNumber: user.phoneNumber,
-    address: user.address,
-    city: user.city,
-    state: user.state,
-    pincode: user.pincode,
+    phone: user.phoneNumber || user.phone || '',
+    phoneNumber: user.phoneNumber || user.phone || '',
+    address: user.address || '',
+    city: user.city || '',
+    state: user.state || '',
+    pincode: user.pincode || '',
+    verificationStatus: user.verificationStatus || 'verified',
     createdAt: user.createdAt
   };
 }
@@ -52,6 +67,7 @@ const transporter = nodemailer.createTransport({
 
 // ===============================
 // Signup (Onboarding with Role & Details)
+// Supports roles: seller, buyer, admin
 // ===============================
 
 app.post('/api/auth/signup', async (req, res) => {
@@ -69,17 +85,12 @@ app.post('/api/auth/signup', async (req, res) => {
       password
     } = req.body;
 
-    // 1. Role validation (buyer or seller)
-    if (!role) {
+    // 1. Role validation (seller, buyer, admin)
+    const userRole = role ? String(role).toLowerCase().trim() : USER_ROLES.SELLER;
+    if (!ALL_ROLES.includes(userRole)) {
       return res.status(400).json({
-        message: 'Role is required. Must be either "buyer" or "seller".'
-      });
-    }
-
-    const normalizedRole = String(role).toLowerCase().trim();
-    if (!['buyer', 'seller'].includes(normalizedRole)) {
-      return res.status(400).json({
-        message: 'Invalid role. Role must be strictly "buyer" or "seller".'
+        success: false,
+        message: `Invalid role. Role must be one of: ${ALL_ROLES.join(', ')}`
       });
     }
 
@@ -88,7 +99,7 @@ app.post('/api/auth/signup', async (req, res) => {
     const missingFields = [];
 
     if (!name || !String(name).trim()) missingFields.push('name');
-    if (!contactPhone) missingFields.push('phoneNumber');
+    if (!contactPhone) missingFields.push('phone / phoneNumber');
     if (!address || !String(address).trim()) missingFields.push('address');
     if (!city || !String(city).trim()) missingFields.push('city');
     if (!state || !String(state).trim()) missingFields.push('state');
@@ -98,6 +109,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (missingFields.length > 0) {
       return res.status(400).json({
+        success: false,
         message: `Missing required onboarding fields: ${missingFields.join(', ')}`
       });
     }
@@ -108,6 +120,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (existingUser) {
       return res.status(409).json({
+        success: false,
         message: 'An account with this email already exists'
       });
     }
@@ -117,7 +130,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     // 5. Create user with role and profile details
     const newUser = await User.create({
-      role: normalizedRole,
+      role: userRole,
       name: String(name).trim(),
       phoneNumber: contactPhone,
       address: String(address).trim(),
@@ -137,20 +150,30 @@ app.post('/api/auth/signup', async (req, res) => {
       },
       JWT_SECRET,
       {
-        expiresIn: '1d'
+        expiresIn: '7d'
       }
     );
 
     return res.status(201).json({
+      success: true,
       message: 'User registered successfully',
-      token,
-      user: sanitizeUser(newUser)
+      data: {
+        user: {
+          id: newUser._id.toString(),
+          name: newUser.name,
+          email: newUser.email,
+          phone: newUser.phoneNumber,
+          role: newUser.role
+        },
+        token
+      }
     });
 
   } catch (error) {
     console.error(error);
 
     return res.status(500).json({
+      success: false,
       message: 'Internal server error'
     });
   }
@@ -158,28 +181,40 @@ app.post('/api/auth/signup', async (req, res) => {
 
 
 // ===============================
-// Login
+// 1. LOGIN API
+// Endpoint: POST /api/auth/login
+// 1. Validate email and password.
+// 2. Find the user by email.
+// 3. Verify the password securely.
+// 4. Read the role from the database.
+// 5. Generate the authentication token/JWT.
+// 6. Return the user's basic information and role.
 // ===============================
 
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 1. Validate email and password
     if (!email || !password) {
       return res.status(400).json({
+        success: false,
         message: 'Email and password required'
       });
     }
 
+    // 2. Find the user by email
     const normalizedEmail = String(email).toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(401).json({
+        success: false,
         message: 'Invalid credentials'
       });
     }
 
+    // 3. Verify the password securely
     const isMatch = await bcrypt.compare(
       password,
       user.password
@@ -187,11 +222,15 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!isMatch) {
       return res.status(401).json({
+        success: false,
         message: 'Invalid credentials'
       });
     }
 
-    // Include role in JWT payload
+    // 4. Read the role from the database record
+    const role = user.role;
+
+    // 5. Generate authentication token/JWT
     const token = jwt.sign(
       {
         userId: user._id,
@@ -200,24 +239,36 @@ app.post('/api/auth/login', async (req, res) => {
       },
       JWT_SECRET,
       {
-        expiresIn: '1d'
+        expiresIn: '7d'
       }
     );
 
+    // 6. Return user's basic information and role (without password)
     return res.status(200).json({
+      success: true,
       message: 'Login successful',
-      token,
-      user: sanitizeUser(user)
+      data: {
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          phone: user.phoneNumber || user.phone || '',
+          role: role
+        },
+        token: token
+      }
     });
 
   } catch (error) {
     console.error(error);
 
     return res.status(500).json({
+      success: false,
       message: 'Internal server error'
     });
   }
 });
+
 
 
 
@@ -335,20 +386,16 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
-
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
     return res.status(200).json({
-      user: sanitizeUser(user)
+      success: true,
+      data: {
+        user: sanitizeUser(req.user)
+      }
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({
+      success: false,
       message: 'Internal server error'
     });
   }
@@ -356,42 +403,29 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 
 
 // ===============================
-// Role-Protected Screen Routes (RBAC)
-// These routes guarantee that buyers cannot access seller screens/data
-// and vice-versa, either via direct URLs or API calls.
+// Seller Routes (Dashboard, Products, etc.)
+// Role: 'seller' only (Verified from database record)
 // ===============================
 
-// Seller-only screens & actions
-app.get('/api/seller/dashboard', authenticateToken,  authorizeRoles('seller'), async (req, res) => {
-  try {
-    const seller = await User.findById(req.user.userId);
+app.use('/api/seller', sellerRoutes);
 
-    return res.status(200).json({
-      message: 'Welcome to Seller Dashboard',
-      user: sanitizeUser(seller),
-      screensAllowed: [
-        'SELLER_DASHBOARD',
-        'CROP_INVENTORY_MANAGEMENT',
-        'POST_NEW_PRODUCE_LISTING',
-        'VIEW_BUYER_OFFERS_AND_ORDERS',
-        'MANDI_PRICE_INSIGHTS',
-        'SELLER_PAYOUTS_WALLET'
-      ]
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-});
+// Dedicated Image Upload Route Alias (Section 7)
+app.post(
+  '/api/uploads/product-images',
+  authenticateToken,
+  authorizeRoles(USER_ROLES.SELLER),
+  uploadProductImages,
+  (req, res) => productController.uploadImages(req, res)
+);
+
 
 // Buyer-only screens & actions
 app.get('/api/buyer/dashboard', authenticateToken, authorizeRoles('buyer'), async (req, res) => {
   try {
-    const buyer = await User.findById(req.user.userId);
-
     return res.status(200).json({
+      success: true,
       message: 'Welcome to Buyer Dashboard',
-      user: sanitizeUser(buyer),
+      user: sanitizeUser(req.user),
       screensAllowed: [
         'BUYER_MARKETPLACE',
         'EXPLORE_CROPS_AND_PRODUCE',
@@ -402,7 +436,7 @@ app.get('/api/buyer/dashboard', authenticateToken, authorizeRoles('buyer'), asyn
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
@@ -412,11 +446,12 @@ app.get('/api/buyer/dashboard', authenticateToken, authorizeRoles('buyer'), asyn
 // ===============================
 
 app.get('/', (req, res) => {
-
   res.json({
-    message: 'Auth API is running'
+    success: true,
+    message: 'Krishi Platform API is running'
   });
 });
+
 
 
 // ===============================
