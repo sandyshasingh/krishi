@@ -16,6 +16,7 @@ const { authenticateToken, authorizeRoles, JWT_SECRET } = require('./middleware/
 const { uploadProductImages } = require('./middleware/upload.middleware');
 const productController = require('./controllers/product.controller');
 const sellerRoutes = require('./routes/seller');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -408,6 +409,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // ===============================
 
 app.use('/api/seller', sellerRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Dedicated Image Upload Route Alias (Section 7)
 app.post(

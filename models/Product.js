@@ -208,6 +208,23 @@ const productSchema = new mongoose.Schema(
     deletedAt: {
       type: Date,
       default: null
+    },
+
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+
+    verifiedAt: {
+      type: Date,
+      default: null
+    },
+
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: ''
     }
   },
   {
@@ -267,6 +284,8 @@ productSchema.methods.toSellerJSON = function () {
     tags: this.tags || [],
     status: this.status,
     verificationStatus: this.verificationStatus,
+    verifiedAt: this.verifiedAt || null,
+    rejectionReason: this.rejectionReason || '',
     interestedBuyers: this.interestedBuyers ?? 0,
     highestOffer: this.highestOffer !== undefined ? this.highestOffer : null,
     images: this.images || [],
