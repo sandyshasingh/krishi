@@ -175,10 +175,15 @@ router.delete('/products/:productId', (req, res) => productController.deleteProd
 
 /**
  * ==================================================
- * 16. PRODUCT INQUIRIES
- * Endpoint: GET /api/seller/products/:productId/inquiries
+ * 16. SELLER INQUIRIES
+ * Endpoints:
+ *   GET /api/seller/inquiries (all inquiries across all crops)
+ *   GET /api/seller/all_inquiries (alias)
+ *   GET /api/seller/products/:productId/inquiries (single crop)
  * ==================================================
  */
+router.get('/inquiries', (req, res) => inquiryController.getAllSellerInquiries(req, res));
+router.get('/all_inquiries', (req, res) => inquiryController.getAllSellerInquiries(req, res));
 router.get('/products/:productId/inquiries', (req, res) => inquiryController.getProductInquiries(req, res));
 
 module.exports = router;

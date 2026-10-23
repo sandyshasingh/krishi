@@ -17,6 +17,7 @@ const { uploadProductImages } = require('./middleware/upload.middleware');
 const productController = require('./controllers/product.controller');
 const sellerRoutes = require('./routes/seller');
 const adminRoutes = require('./routes/admin');
+const buyerRoutes = require('./routes/buyer');
 
 const app = express();
 
@@ -410,37 +411,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
-
-// Dedicated Image Upload Route Alias (Section 7)
-app.post(
-  '/api/uploads/product-images',
-  authenticateToken,
-  authorizeRoles(USER_ROLES.SELLER),
-  uploadProductImages,
-  (req, res) => productController.uploadImages(req, res)
-);
-
-
-// Buyer-only screens & actions
-app.get('/api/buyer/dashboard', authenticateToken, authorizeRoles('buyer'), async (req, res) => {
-  try {
-    return res.status(200).json({
-      success: true,
-      message: 'Welcome to Buyer Dashboard',
-      user: sanitizeUser(req.user),
-      screensAllowed: [
-        'BUYER_MARKETPLACE',
-        'EXPLORE_CROPS_AND_PRODUCE',
-        'CREATE_PURCHASE_ORDER',
-        'TRACK_DELIVERIES',
-        'PURCHASE_HISTORY_AND_INVOICES'
-      ]
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
+app.use('/api/buyer', buyerRoutes);
 
 
 // ===============================

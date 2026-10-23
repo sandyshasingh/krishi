@@ -25,7 +25,10 @@ const inquirySchema = new mongoose.Schema(
     buyer: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       name: { type: String, trim: true },
-      phone: { type: String, trim: true }
+      phone: { type: String, trim: true },
+      email: { type: String, trim: true },
+      city: { type: String, trim: true },
+      state: { type: String, trim: true }
     },
 
     productId: {
@@ -42,11 +45,13 @@ const inquirySchema = new mongoose.Schema(
 
     quantityRequested: {
       type: Number,
+      required: [true, 'Quantity requested is mandatory'],
       min: [1, 'Quantity requested must be greater than zero']
     },
 
     offerPrice: {
       type: Number,
+      default: null,
       min: [0, 'Offer price cannot be negative']
     },
 
@@ -94,12 +99,19 @@ inquirySchema.methods.toClientJSON = function () {
     id: this._id.toString(),
     buyer: {
       id: this.buyer?.id?.toString() || this.buyerId?.toString() || '',
-      name: this.buyer?.name || 'Interested Buyer'
+      name: this.buyer?.name || 'Interested Buyer',
+      phoneNumber: this.buyer?.phone || '',
+      phone: this.buyer?.phone || '',
+      email: this.buyer?.email || '',
+      city: this.buyer?.city || '',
+      state: this.buyer?.state || ''
     },
     productId: (this.productId || this.product)?.toString(),
     quantityRequested: this.quantityRequested ?? 0,
-    offerPrice: this.offerPrice ?? 0,
+    offerPrice: this.offerPrice !== undefined ? this.offerPrice : null,
+    message: this.message || '',
     status: this.status,
+    isNewInquiry: this.isNewInquiry ?? false,
     createdAt: this.createdAt
   };
 };
