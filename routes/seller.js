@@ -141,9 +141,14 @@ router.get('/products/:productId', (req, res) => productController.getProductByI
 /**
  * ==================================================
  * 13. EDIT PRODUCT
- * Endpoints: PUT & PATCH /api/seller/products/:productId
+ * Endpoints:
+ *   POST /api/seller/products/update (productId in body)
+ *   POST /api/seller/update_product (productId in body)
+ *   PUT & PATCH /api/seller/products/:productId (Legacy REST)
  * ==================================================
  */
+router.post('/products/update', (req, res) => productController.updateProduct(req, res));
+router.post('/update_product', (req, res) => productController.updateProduct(req, res));
 router.put('/products/:productId', (req, res) => productController.updateProduct(req, res));
 router.patch('/products/:productId', (req, res) => productController.updateProduct(req, res));
 
@@ -158,9 +163,14 @@ router.post('/products/:productId/publish', (req, res) => productController.publ
 /**
  * ==================================================
  * 14. DELETE PRODUCT (Soft delete)
- * Endpoint: DELETE /api/seller/products/:productId
+ * Endpoints:
+ *   POST /api/seller/products/delete (productId in body)
+ *   POST /api/seller/delete_product (productId in body)
+ *   DELETE /api/seller/products/:productId (Legacy REST)
  * ==================================================
  */
+router.post('/products/delete', (req, res) => productController.deleteProduct(req, res));
+router.post('/delete_product', (req, res) => productController.deleteProduct(req, res));
 router.delete('/products/:productId', (req, res) => productController.deleteProduct(req, res));
 
 /**

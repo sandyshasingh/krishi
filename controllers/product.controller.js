@@ -117,11 +117,17 @@ class ProductController {
 
   /**
    * Update an existing product
-   * PUT /api/seller/products/:productId & PATCH /api/seller/products/:productId
+   * POST /api/seller/products/update (productId in body)
+   * POST /api/seller/update_product (productId in body)
+   * PUT /api/seller/products/:productId & PATCH /api/seller/products/:productId (Legacy REST)
    */
   async updateProduct(req, res) {
     try {
-      const { productId } = req.params;
+      const productId = req.body?.productId || req.body?.id || req.params?.productId;
+
+      if (!productId) {
+        return errorResponse(res, 400, 'Product ID is required in request body', ERROR_CODES.VALIDATION_ERROR);
+      }
 
       if (!isValidObjectId(productId)) {
         return errorResponse(res, 400, 'Invalid product ID format', ERROR_CODES.VALIDATION_ERROR);
@@ -181,11 +187,17 @@ class ProductController {
 
   /**
    * Soft-delete a product
-   * DELETE /api/seller/products/:productId
+   * POST /api/seller/products/delete (productId in body)
+   * POST /api/seller/delete_product (productId in body)
+   * DELETE /api/seller/products/:productId (Legacy REST)
    */
   async deleteProduct(req, res) {
     try {
-      const { productId } = req.params;
+      const productId = req.body?.productId || req.body?.id || req.params?.productId;
+
+      if (!productId) {
+        return errorResponse(res, 400, 'Product ID is required in request body', ERROR_CODES.VALIDATION_ERROR);
+      }
 
       if (!isValidObjectId(productId)) {
         return errorResponse(res, 400, 'Invalid product ID format', ERROR_CODES.VALIDATION_ERROR);
@@ -193,6 +205,7 @@ class ProductController {
 
       const sellerId = req.user._id;
       const deleted = await productService.softDeleteSellerProduct(sellerId, productId);
+    
 
       if (!deleted) {
         return errorResponse(res, 404, 'Product not found or unauthorized', ERROR_CODES.PRODUCT_NOT_FOUND);
