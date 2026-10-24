@@ -86,4 +86,42 @@ router.post('/show_interest', (req, res) => buyerController.showInterest(req, re
  */
 router.get('/inquiries', (req, res) => buyerController.getMyInquiries(req, res));
 
+/**
+ * ==================================================
+ * 6. LIST OF PRODUCTS BUYER HAS SHOWN INTEREST IN (buyerInterests)
+ * Endpoints:
+ *   GET /api/buyer/buyerInterests (exact requested name)
+ *   GET /api/buyer/buyer-interests
+ *   GET /api/buyer/interests
+ * Query Params: page, limit
+ * ==================================================
+ */
+router.get('/buyerInterests', (req, res) => buyerController.buyerInterests(req, res));
+router.get('/buyer-interests', (req, res) => buyerController.buyerInterests(req, res));
+router.get('/interests', (req, res) => buyerController.buyerInterests(req, res));
+
+/**
+ * ==================================================
+ * 7. BROWSE ALL FARMERS / SELLERS
+ * Endpoints:
+ *   GET /api/buyer/farmers
+ *   GET /api/buyer/sellers
+ * Query Params: page, limit, search, city, state
+ * ==================================================
+ */
+router.get('/farmers', (req, res) => buyerController.getFarmers(req, res));
+router.get('/sellers', (req, res) => buyerController.getFarmers(req, res));
+
+/**
+ * ==================================================
+ * 8. GET A SPECIFIC FARMER & HIS LISTED PRODUCTS
+ * Endpoints:
+ *   GET /api/buyer/farmers/:farmerId/products
+ *   GET /api/buyer/farmers/:farmerId
+ * Query Params: page, limit, category, search
+ * ==================================================
+ */
+router.get('/farmers/:farmerId/products', (req, res) => buyerController.getFarmerProducts(req, res));
+router.get('/farmers/:farmerId', (req, res) => buyerController.getFarmerProducts(req, res));
+
 module.exports = router;

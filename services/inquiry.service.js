@@ -255,6 +255,81 @@ class InquiryService {
       newCount
     };
   }
+
+  /**
+   * 6. GET PRODUCTS BUYER HAS SHOWN INTEREST IN (buyerInterests)
+   */
+  async getBuyerInterests(buyerId, query = {}) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter = {
+      $or: [{ buyerId }, { 'buyer.id': buyerId }]
+    };
+
+    const [totalCount, inquiries] = await Promise.all([
+      Inquiry.countDocuments(filter),
+      Inquiry.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('productId', 'name localName category quantity expectedPrice images status location transportation description tags')
+        .populate('sellerId', 'name email phoneNumber phone city state verificationStatus')
+        .lean()
+    ]);
+
+    const buyerInterests = inquiries.map((inq) => {
+      const prod = inq.productId || {};
+      const seller = inq.sellerId || {};
+      return {
+        inquiryId: inq._id.toString(),
+        interestDetails: {
+          quantityRequested: inq.quantityRequested,
+          offerPrice: inq.offerPrice !== undefined ? inq.offerPrice : null,
+          message: inq.message || '',
+          status: inq.status,
+          expressedAt: inq.createdAt
+        },
+        product: {
+          productId: prod._id ? prod._id.toString() : inq.productId?.toString(),
+          name: prod.name || 'Product',
+          localName: prod.localName || '',
+          category: prod.category || '',
+          quantity: prod.quantity || null,
+          expectedPrice: prod.expectedPrice || null,
+          location: prod.location || null,
+          transportation: prod.transportation || null,
+          description: prod.description || '',
+          tags: prod.tags || [],
+          images: prod.images || [],
+          status: prod.status || 'unknown'
+        },
+        seller: {
+          id: seller._id ? seller._id.toString() : (inq.sellerId ? inq.sellerId.toString() : null),
+          name: seller.name || 'Seller',
+          phoneNumber: seller.phoneNumber || seller.phone || '',
+          phone: seller.phoneNumber || seller.phone || '',
+          email: seller.email || '',
+          city: seller.city || '',
+          state: seller.state || '',
+          verificationStatus: seller.verificationStatus || 'verified'
+        }
+      };
+    });
+
+    return {
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit) || 1,
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPrevPage: page > 1
+      },
+      buyerInterests
+    };
+  }
 }
 
 module.exports = new InquiryService();
